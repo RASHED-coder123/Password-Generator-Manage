@@ -31,7 +31,7 @@ def generate_password(
 ) -> str:
     """Generate a password containing at least one character from each enabled set."""
     if length < 4:
-        raise ValueError("طول كلمة المرور يجب أن يكون 4 أحرف على الأقل.")
+        raise ValueError("Password length must be at least 4 characters.")
 
     groups = []
     if uppercase:
@@ -43,9 +43,9 @@ def generate_password(
     if symbols:
         groups.append("!@#$%^&*()-_=+[]{};:,.?/\\")
     if not groups:
-        raise ValueError("يجب اختيار نوع واحد من الأحرف على الأقل.")
+        raise ValueError("Select at least one character type.")
     if len(groups) > length:
-        raise ValueError("الطول أصغر من عدد أنواع الأحرف المختارة.")
+        raise ValueError("Length is smaller than the number of selected character types.")
 
     alphabet = "".join(groups)
     password = [secrets.choice(group) for group in groups]
@@ -55,9 +55,9 @@ def generate_password(
 
 
 def evaluate_password(password: str) -> tuple[str, int]:
-    """Return an Arabic strength label and a simple score from 0 to 5."""
+    """Return an English strength label and a simple score from 0 to 6."""
     if not password:
-        return "ضعيفة", 0
+        return "Weak", 0
 
     score = 0
     if len(password) >= 8:
@@ -77,7 +77,7 @@ def evaluate_password(password: str) -> tuple[str, int]:
     if password.lower() in common or len(set(password)) <= 2:
         score = min(score, 1)
 
-    label = "ضعيفة" if score <= 2 else "متوسطة" if score <= 4 else "قوية"
+    label = "Weak" if score <= 2 else "Medium" if score <= 4 else "Strong"
     return label, score
 
 
@@ -118,22 +118,22 @@ def _encrypt(payload: dict[str, Any], master_password: str) -> dict[str, Any]:
 def _decrypt(envelope: dict[str, Any], master_password: str) -> dict[str, Any]:
     try:
         if envelope["version"] != FORMAT_VERSION:
-            raise ValueError("إصدار الخزنة غير مدعوم.")
+            raise ValueError("Unsupported vault version.")
         salt = base64.b64decode(envelope["salt"])
         nonce = base64.b64decode(envelope["nonce"])
         ciphertext = base64.b64decode(envelope["ciphertext"])
         expected_tag = base64.b64decode(envelope["tag"])
     except (KeyError, ValueError, TypeError) as exc:
-        raise ValueError("ملف الخزنة تالف أو غير صالح.") from exc
+        raise ValueError("The vault file is corrupted or invalid.") from exc
 
     key = _derive_key(master_password, salt)
     actual_tag = hmac.new(key, nonce + ciphertext, hashlib.sha256).digest()
     if not hmac.compare_digest(actual_tag, expected_tag):
-        raise ValueError("كلمة المرور الرئيسية غير صحيحة أو الخزنة تالفة.")
+        raise ValueError("The master password is incorrect or the vault is corrupted.")
     try:
         return json.loads(_xor_stream(ciphertext, key, nonce).decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError("تعذر قراءة بيانات الخزنة.") from exc
+        raise ValueError("Unable to read vault data.") from exc
 
 
 def load_vault(path: Path, master_password: str) -> dict[str, Any]:
@@ -142,7 +142,7 @@ def load_vault(path: Path, master_password: str) -> dict[str, Any]:
     try:
         envelope = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"تعذر قراءة ملف الخزنة: {exc}") from exc
+        raise ValueError(f"Unable to read vault file: {exc}") from exc
     return _decrypt(envelope, master_password)
 
 
@@ -157,13 +157,13 @@ def save_vault(path: Path, vault: dict[str, Any], master_password: str) -> None:
 
 
 def _master_password(confirm: bool = False) -> str:
-    password = getpass.getpass("كلمة المرور الرئيسية: ")
+    password = getpass.getpass("Master password: ")
     if not password:
-        raise ValueError("كلمة المرور الرئيسية لا يمكن أن تكون فارغة.")
+        raise ValueError("The master password cannot be empty.")
     if confirm:
-        repeated = getpass.getpass("أكد كلمة المرور الرئيسية: ")
+        repeated = getpass.getpass("Confirm master password: ")
         if password != repeated:
-            raise ValueError("كلمتا المرور غير متطابقتين.")
+            raise ValueError("The master passwords do not match.")
     return password
 
 
@@ -177,13 +177,13 @@ def _cmd_generate(args: argparse.Namespace) -> None:
     )
     label, score = evaluate_password(password)
     print(password)
-    print(f"القوة: {label} ({score}/6)")
+    print(f"Strength: {label} ({score}/6)")
 
 
 def _cmd_strength(_: argparse.Namespace) -> None:
-    password = getpass.getpass("كلمة المرور للتقييم: ")
+    password = getpass.getpass("Password to evaluate: ")
     label, score = evaluate_password(password)
-    print(f"القوة: {label} ({score}/6)")
+    print(f"Strength: {label} ({score}/6)")
 
 
 def _cmd_add(args: argparse.Namespace) -> None:
@@ -194,10 +194,10 @@ def _cmd_add(args: argparse.Namespace) -> None:
     entry = {"site": args.site, "username": args.username, "password": args.password}
     if existing:
         existing.update(entry)
-        print("تم تحديث السجل.")
+        print("Entry updated.")
     else:
         entries.append(entry)
-        print("تمت إضافة السجل.")
+        print("Entry added.")
     save_vault(args.vault, vault, master)
 
 
@@ -207,10 +207,10 @@ def _cmd_search(args: argparse.Namespace) -> None:
     query = args.query.lower()
     matches = [entry for entry in vault.get("entries", []) if query in entry["site"].lower()]
     if not matches:
-        print("لا توجد نتائج.")
+        print("No matching entries found.")
         return
     for entry in matches:
-        print(f"الموقع: {entry['site']}\nالحساب: {entry['username']}\nكلمة المرور: {entry['password']}\n")
+        print(f"Site: {entry['site']}\nUsername: {entry['username']}\nPassword: {entry['password']}\n")
 
 
 def _cmd_list(args: argparse.Namespace) -> None:
@@ -218,18 +218,18 @@ def _cmd_list(args: argparse.Namespace) -> None:
     vault = load_vault(args.vault, master)
     entries = vault.get("entries", [])
     if not entries:
-        print("الخزنة فارغة.")
+        print("The vault is empty.")
         return
     for entry in entries:
         print(f"- {entry['site']} ({entry['username']})")
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="مولّد ومدير كلمات المرور")
-    parser.add_argument("--vault", type=Path, default=DEFAULT_VAULT, help="مسار ملف الخزنة")
+    parser = argparse.ArgumentParser(description="Password generator and manager")
+    parser.add_argument("--vault", type=Path, default=DEFAULT_VAULT, help="Path to the vault file")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    generate = subparsers.add_parser("generate", help="توليد كلمة مرور")
+    generate = subparsers.add_parser("generate", help="Generate a password")
     generate.add_argument("-l", "--length", type=int, default=20)
     generate.add_argument("--no-uppercase", dest="uppercase", action="store_false")
     generate.add_argument("--no-lowercase", dest="lowercase", action="store_false")
@@ -237,20 +237,20 @@ def build_parser() -> argparse.ArgumentParser:
     generate.add_argument("--no-symbols", dest="symbols", action="store_false")
     generate.set_defaults(func=_cmd_generate, uppercase=True, lowercase=True, digits=True, symbols=True)
 
-    strength = subparsers.add_parser("strength", help="تقييم قوة كلمة مرور")
+    strength = subparsers.add_parser("strength", help="Evaluate password strength")
     strength.set_defaults(func=_cmd_strength)
 
-    add = subparsers.add_parser("add", help="إضافة أو تحديث سجل")
+    add = subparsers.add_parser("add", help="Add or update an entry")
     add.add_argument("site")
     add.add_argument("username")
-    add.add_argument("password", nargs="?", help="اتركه فارغًا ليتم توليده")
+    add.add_argument("password", nargs="?", help="Leave empty to generate a password")
     add.set_defaults(func=_cmd_add)
 
-    search = subparsers.add_parser("search", help="البحث عن سجل وعرض كلمة المرور")
+    search = subparsers.add_parser("search", help="Search for an entry and show its password")
     search.add_argument("query")
     search.set_defaults(func=_cmd_search)
 
-    list_entries = subparsers.add_parser("list", help="عرض المواقع والحسابات دون كلمات المرور")
+    list_entries = subparsers.add_parser("list", help="List sites and usernames without passwords")
     list_entries.set_defaults(func=_cmd_list)
     return parser
 
@@ -260,11 +260,11 @@ def main() -> int:
     args = parser.parse_args()
     if args.command == "add" and not args.password:
         args.password = generate_password()
-        print(f"تم توليد كلمة المرور: {args.password}")
+        print(f"Generated password: {args.password}")
     try:
         args.func(args)
     except (ValueError, OSError) as exc:
-        print(f"خطأ: {exc}", file=sys.stderr)
+        print(f"Error: {exc}", file=sys.stderr)
         return 1
     return 0
 

@@ -1,52 +1,52 @@
-# مدير كلمات المرور
+# Password Generator and Manager
 
-أداة سطر أوامر محلية مكتوبة ببايثون. لا تحتاج إلى تثبيت أي مكتبات خارجية.
+A local command-line password manager written in Python. It has no external dependencies.
 
-## التشغيل
+## Usage
 
 ```powershell
 python E:\password_manager.py generate --length 24
 ```
 
-الأوامر المتاحة:
+Available commands:
 
 ```text
-generate   توليد كلمة مرور
-strength   تقييم كلمة مرور (تُقرأ دون إظهارها على الشاشة)
-add        إضافة أو تحديث موقع وحساب وكلمة مرور
-search     البحث عن موقع وعرض بياناته
-list       عرض المواقع والحسابات دون عرض كلمات المرور
+generate   Generate a password
+strength   Evaluate a password (input is hidden)
+add        Add or update a site, username, and password
+search     Search for a site and show its credentials
+list       List sites and usernames without showing passwords
 ```
 
-أمثلة:
+Examples:
 
 ```powershell
-# توليد كلمة مرور من 16 حرفًا دون رموز
+# Generate a 16-character password without symbols
 python E:\password_manager.py generate --length 16 --no-symbols
 
-# إضافة سجل؛ إذا لم تُمرر كلمة المرور فسيتم توليدها تلقائيًا
+# Add an entry; omit the password to generate one automatically
 python E:\password_manager.py add example.com user@example.com
 
-# إضافة كلمة مرور محددة
+# Add a specific password
 python E:\password_manager.py add github.com user "MySecret!123"
 
-# عرض المواقع المحفوظة ثم البحث
+# List saved sites, then search
 python E:\password_manager.py list
 python E:\password_manager.py search github
 ```
 
-## التخزين والحماية
+## Storage and security
 
-الخزنة الافتراضية هي:
+The default vault is:
 
 ```text
 %USERPROFILE%\.password_manager_vault.json
 ```
 
-يمكن تغيير مكانها بإضافة `--vault` قبل الأمر، مثل:
+Use `--vault` before the command to choose a different location:
 
 ```powershell
 python E:\password_manager.py --vault E:\vault.json list
 ```
 
-تُشتق مفاتيح التشفير من كلمة المرور الرئيسية باستخدام PBKDF2-HMAC-SHA256 مع salt عشوائي، وتُحمى البيانات أيضًا بـ HMAC لاكتشاف العبث بالملف. كلمة المرور الرئيسية لا تُحفظ في الملف. احفظ نسخة احتياطية من ملف الخزنة، لأن فقدان كلمة المرور الرئيسية يعني فقدان القدرة على فك البيانات.
+Encryption keys are derived from the master password using PBKDF2-HMAC-SHA256 with a random salt. The data is also protected with HMAC to detect file tampering. The master password is never stored in the vault. Keep a backup of the vault file; losing the master password means losing access to the encrypted data.
